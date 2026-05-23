@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Workflow Forge — Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Unbounded:wght@200;300;400;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --void:       #02030a;
+  --deep:       #05070f;
+  --panel:      #080d1a;
+  --panel-hi:   #0b1224;
+  --panel-rim:  #0f1830;
+
+  --stardust:   rgba(180,200,255,0.06);
+  --border:     rgba(100,140,255,0.12);
+  --border-hi:  rgba(100,140,255,0.24);
+  --border-act: rgba(120,220,255,0.45);
+
+  --star:       #e8f0ff;
+  --nebula-1:   #7c3aed;
+  --nebula-2:   #0ea5e9;
+  --nebula-3:   #ec4899;
+  --nebula-4:   #10b981;
+
+  --aurora:     #38bdf8;
+  --aurora-dim: rgba(56,189,248,0.1);
+  --aurora-glow:rgba(56,189,248,0.2);
+  --pulsar:     #a78bfa;
+  --comet:      #fb923c;
+
+  --text:       #c8d8f0;
+  --text-dim:   #5a7090;
+  --text-muted: #2a3a52;
+
+  --syn-k:      #93c5fd;
+  --syn-v:      #fde68a;
+  --syn-s:      #86efac;
+  --syn-c:      #334155;
+  --syn-n:      #f9a8d4;
+  --syn-p:      #67e8f9;
+  --syn-x:      #c084fc;
+
+  --mono:    'Space Mono', monospace;
+  --display: 'Unbounded', sans-serif;
+  --serif:   'DM Serif Display', serif;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: crosshair;
+}
+
+/* ── SPACE CANVAS ── */
+#cosmos {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none; z-index: 1000;
+}
+
+.shell {
+  position: relative; z-index: 2;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 1.8rem 6rem;
+}
+
+/* ══ TOPBAR ══ */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.2rem 0 1rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 200;
+  background: rgba(2,3,10,0.85);
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+
+.brand {
+  display: flex; align-items: center; gap: 1rem;
+}
+
+.brand-sigil {
+  width: 36px; height: 36px;
+  border: 1px solid var(--aurora);
+  display: grid; place-items: center;
+  position: relative;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+.brand-sigil::before {
+  content: '';
+  position: absolute; inset: 3px;
+  border: 1px solid rgba(56,189,248,0.3);
+}
+.brand-sigil-inner {
+  width: 6px; height: 6px;
+  background: var(--aurora);
+  transform: rotate(0deg);
+  box-shadow: 0 0 12px var(--aurora);
+}
+
+.brand-name {
+  font-family: var(--display);
+  font-weight: 300; font-size: .85rem;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--star);
+  line-height: 1;
+}
+.brand-name span {
+  display: block;
+  font-size: .5rem; font-weight: 200;
+  letter-spacing: .3em; color: var(--text-dim);
+  margin-top: .3rem;
+}
+
+.topbar-right {
+  display: flex; align-items: center; gap: 1rem;
+}
+.coord {
+  font-size: .58rem; color: var(--text-muted);
+  letter-spacing: .12em; line-height: 1.8;
+  text-align: right;
+}
+.coord span { color: var(--aurora); }
+
+.sys-status {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .58rem; color: var(--aurora);
+  letter-spacing: .15em; text-transform: uppercase;
+  border: 1px solid rgba(56,189,248,0.2);
+  padding: .28rem .8rem;
+}
+.sys-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--aurora);
+  animation: sys-pulse 2.4s ease infinite;
+}
+@keyframes sys-pulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,.6);}
+  50%{box-shadow:0 0 0 5px transparent;}
+}
+
+/* ══ HEADER ══ */
+.header {
+  padding: 3.5rem 0 3rem;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 3rem; align-items: end;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2.4rem;
+}
+@media(max-width:900px){.header{grid-template-columns:1fr;}}
+
+.header-title {
+  font-family: var(--display);
+  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  font-weight: 200;
+  line-height: 1.08;
+  letter-spacing: -.01em;
+  color: var(--star);
+}
+.header-title em {
+  font-family: var(--serif);
+  font-style: italic; font-weight: 400;
+  color: var(--aurora);
+  display: block;
+  font-size: 1.12em;
+}
+.header-desc {
+  margin-top: 1.1rem;
+  font-size: .65rem;
+  color: var(--text-dim);
+  letter-spacing: .08em;
+  line-height: 2;
+  max-width: 460px;
+}
+.header-desc b { color: var(--text); font-weight: 400; }
+
+.telemetry-block {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1.2rem;
+  font-size: .6rem; color: var(--text-muted);
+  letter-spacing: .1em; line-height: 2.2;
+}
+.tel-row {
+  display: flex; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding: .2rem 0;
+}
+.tel-row:last-child { border-bottom: none; }
+.tel-row span:last-child { color: var(--aurora); }
+
+/* ══ LAYOUT ══ */
+.workspace {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 1.4rem;
+  align-items: start;
+}
+@media(max-width:960px){.workspace{grid-template-columns:1fr;}}
+
+/* ══ PANEL BASE ══ */
+.pnl {
+  background: rgba(8,13,26,0.8);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+.pnl-cap {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .7rem 1rem;
+  background: rgba(11,18,36,0.9);
+  border-bottom: 1px solid var(--border);
+}
+.pnl-label {
+  font-size: .56rem; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--aurora);
+  display: flex; align-items: center; gap: .5rem;
+}
+.pnl-label::before {
+  content: '';
+  width: 4px; height: 4px;
+  background: var(--aurora);
+  box-shadow: 0 0 6px var(--aurora);
+  display: block;
+}
+.pnl-aux {
+  font-size: .54rem; color: var(--text-muted); letter-spacing: .1em;
+}
+
+.sidebar { display: flex; flex-direction: column; gap: 1.2rem; }
+
+/* ══ TEMPLATE GRID ══ */
+.tpl-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: .5rem; padding: .9rem;
+}
+.tpl {
+  background: rgba(5,7,15,0.8);
+  border: 1px solid var(--border);
+  padding: .75rem .8rem;
+  cursor: pointer; text-align: left;
+  transition: border-color .25s, background .25s, transform .2s;
+  position: relative; overflow: hidden;
+  font-family: var(--mono);
+}
+.tpl::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, var(--aurora-dim) 0%, transparent 60%);
+  opacity: 0; transition: opacity .3s;
+}
+.tpl:hover::before { opacity: 1; }
+.tpl:hover {
+  border-color: rgba(56,189,248,0.35);
+  transform: translateY(-2px);
+}
+.tpl.picked { border-color: var(--border-act); background: var(--aurora-dim); }
+.tpl-ic { font-size: 1.1rem; display: block; margin-bottom: .3rem; }
+.tpl-nm { font-size: .72rem; font-weight: 700; display: block; margin-bottom: .15rem; color: var(--star); letter-spacing: -.01em; }
+.tpl-ds { font-size: .53rem; color: var(--text-dim); line-height: 1.55; }
+
+/* ══ DESCRIBE PANEL ══ */
+.p-body { padding: .9rem; }
+
+.fl { display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.lbl { font-size: .54rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); }
+.cc  { color: var(--text-muted); }
+
+textarea {
+  width: 100%;
+  background: rgba(2,3,10,0.9);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: .72rem; line-height: 1.8;
+  padding: .85rem .9rem;
+  resize: vertical; min-height: 115px;
+  outline: none;
+  transition: border-color .3s;
+  caret-color: var(--aurora);
+}
+textarea:focus { border-color: var(--border-act); }
+textarea::placeholder { color: var(--text-muted); }
+
+/* ══ FEATURE CHIPS ══ */
+.feat-row { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .9rem; }
+.chip {
+  display: flex; align-items: center; gap: .3rem;
+  font-size: .54rem; letter-spacing: .12em; text-transform: uppercase;
+  border: 1px solid var(--border);
+  padding: .22rem .6rem;
+  cursor: pointer; color: var(--text-dim);
+  background: rgba(2,3,10,0.6);
+  transition: all .2s; user-select: none;
+}
+.chip:hover { border-color: var(--border-hi); color: var(--text); }
+.chip.on { background: var(--aurora-dim); border-color: var(--border-act); color: var(--aurora); }
+.chip input { display: none; }
+
+/* ══ SELECTS ══ */
+.sel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .8rem; }
+.sg { display: flex; flex-direction: column; gap: .35rem; }
+
+select {
+  width: 100%;
+  background: rgba(2,3,10,0.9);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: .6rem;
+  padding: .42rem .65rem;
+  outline: none; cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%235a7090' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .6rem center;
+  padding-right: 1.8rem;
+  transition: border-color .2s;
+}
+select:focus { border-color: var(--border-act); }
+select option { background: #080d1a; }
+
+/* ══ LAUNCH BUTTON ══ */
+.launch {
+  width: 100%; margin-top: 1rem;
+  padding: .95rem;
+  background: transparent;
+  border: 1px solid var(--aurora);
+  color: var(--aurora);
+  font-family: var(--display);
+  font-size: .62rem; font-weight: 300;
+  letter-spacing: .28em; text-transform: uppercase;
+  cursor: pointer;
+  position: relative; overflow: hidden;
+  transition: color .4s;
+}
+.launch::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--aurora);
+  transform: translateX(-100%) skewX(-5deg);
+  transition: transform .5s cubic-bezier(.22,1,.36,1);
+  z-index: 0;
+}
+.launch:hover { color: var(--void); }
+.launch:hover::before { transform: translateX(0) skewX(0deg); }
+.launch > span { position: relative; z-index: 1; }
+.launch:disabled { opacity: .3; cursor: not-allowed; }
+.launch:disabled::before { display: none; }
+.launch:disabled { color: var(--aurora); }
+
+.hint { font-size: .52rem; color: var(--text-muted); text-align: right; margin-top: .4rem; letter-spacing: .1em; }
+
+/* ══ QUICK PROMPTS ══ */
+.qp-list { display: flex; flex-wrap: wrap; gap: .4rem; padding: .9rem; }
+.qp {
+  font-size: .54rem;
+  border: 1px solid var(--border);
+  padding: .2rem .6rem;
+  color: var(--text-dim);
+  cursor: pointer; background: rgba(2,3,10,0.5);
+  transition: all .2s;
+  letter-spacing: .06em;
+}
+.qp:hover { color: var(--aurora); border-color: rgba(56,189,248,0.3); background: var(--aurora-dim); }
+
+/* ══ HISTORY ══ */
+.hist-list { display: flex; flex-direction: column; gap: .3rem; padding: .9rem; }
+.hist-item {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .45rem .65rem;
+  border: 1px solid var(--border);
+  cursor: pointer; background: rgba(2,3,10,0.5);
+  transition: all .15s;
+}
+.hist-item:hover { border-color: var(--border-hi); background: rgba(56,189,248,0.05); }
+.hist-txt { flex: 1; color: var(--text-dim); font-size: .6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-time { color: var(--text-muted); font-size: .52rem; flex-shrink: 0; }
+.hist-empty { font-size: .6rem; color: var(--text-muted); text-align: center; padding: 1rem 0; }
+
+/* ══ OUTPUT PANEL ══ */
+.output {
+  background: rgba(8,13,26,0.85);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  min-height: 620px;
+  display: flex; flex-direction: column;
+  position: sticky; top: 64px;
+}
+
+/* ── TABS ── */
+.out-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .65rem 1rem;
+  background: rgba(11,18,36,0.95);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; gap: .8rem;
+}
+.tabs { display: flex; }
+.tab {
+  font-family: var(--mono);
+  font-size: .56rem; letter-spacing: .12em; text-transform: uppercase;
+  padding: .28rem .75rem;
+  border: 1px solid var(--border);
+  cursor: pointer; color: var(--text-dim);
+  background: transparent; margin-left: -1px;
+  transition: all .2s;
+}
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--aurora); background: var(--aurora-dim); border-color: var(--border-act); z-index: 1; }
+
+.out-meta { font-size: .54rem; color: var(--text-muted); letter-spacing: .1em; }
+.act-row { display: flex; gap: .35rem; }
+.act {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: .54rem; letter-spacing: .1em; text-transform: uppercase;
+  padding: .25rem .6rem; cursor: pointer;
+  transition: all .2s;
+}
+.act:hover { color: var(--aurora); border-color: rgba(56,189,248,0.3); }
+.act.ok { color: var(--nebula-4); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.06); }
+
+/* ── OUTPUT BODY ── */
+.out-body { flex: 1; overflow: auto; padding: 1.1rem; position: relative; }
+.out-body::-webkit-scrollbar { width: 4px; }
+.out-body::-webkit-scrollbar-track { background: transparent; }
+.out-body::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* Void state */
+.void-state {
+  min-height: 440px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; gap: 1rem;
+}
+.void-glyph {
+  font-family: var(--display);
+  font-size: 5rem; font-weight: 200;
+  color: rgba(56,189,248,0.06);
+  line-height: 1; letter-spacing: -.05em;
+}
+.void-msg {
+  font-size: .62rem; color: var(--text-muted);
+  letter-spacing: .12em; line-height: 2.2;
+}
+.void-hint { font-size: .56rem; color: var(--text-muted); letter-spacing: .1em; }
+code { color: var(--aurora); background: var(--aurora-dim); padding: .08rem .35rem; font-family: var(--mono); }
+
+/* YAML */
+pre {
+  font-family: var(--mono);
+  font-size: .7rem; line-height: 1.9;
+  white-space: pre;
+  overflow-x: auto;
+}
+pre::-webkit-scrollbar { height: 3px; }
+pre::-webkit-scrollbar-thumb { background: var(--border); }
+
+.yl { display: flex; transition: background .12s; }
+.yl:hover { background: rgba(56,189,248,0.03); }
+.ln {
+  display: inline-block; width: 2.2em;
+  text-align: right; margin-right: 1.3em;
+  color: var(--text-muted); font-size: .64rem;
+  user-select: none; flex-shrink: 0;
+  padding-top: .05em;
+}
+.ylc { flex: 1; color: #a8c0d8; }
+.k { color: var(--syn-k); }
+.v { color: var(--syn-v); }
+.s { color: var(--syn-s); }
+.c { color: var(--syn-c); font-style: italic; }
+.n { color: var(--syn-n); }
+.p { color: var(--syn-p); }
+.x { color: var(--syn-x); }
+
+/* Explain */
+.explain-wrap { padding: .5rem 0; }
+.explain-section {
+  margin-bottom: 1.4rem;
+  border-left: 2px solid rgba(56,189,248,0.25);
+  padding-left: 1rem;
+}
+.explain-ttl {
+  font-family: var(--display);
+  font-size: .56rem; font-weight: 300;
+  letter-spacing: .22em; text-transform: uppercase;
+  color: var(--aurora); margin-bottom: .6rem;
+}
+.explain-p { font-size: .72rem; color: #6a8aaa; line-height: 1.85; margin-bottom: .4rem; }
+.explain-ul { list-style: none; padding: 0; }
+.explain-ul li {
+  font-size: .7rem; color: #6a8aaa; line-height: 1.75;
+  display: flex; gap: .5rem; margin-bottom: .25rem;
+}
+.explain-ul li::before { content: '·'; color: var(--aurora); flex-shrink: 0; }
+
+/* README */
+.readme-wrap { font-family: var(--mono); }
+.readme-gh {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  padding: 1.3rem;
+}
+.readme-gh h2 {
+  font-family: -apple-system,'Segoe UI',sans-serif;
+  font-size: 1.05rem; font-weight: 600;
+  color: #f0f6fc; margin-bottom: .8rem;
+}
+.bdg-row { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .9rem; }
+.bdg {
+  height: 20px; display: inline-flex; align-items: center;
+  padding: 0 .55rem; font-size: .6rem;
+  font-family: var(--mono);
+}
+.bdg-pass { background: #238636; color: #fff; }
+.bdg-gray { background: #21262d; color: #cdd9e5; }
+.bdg-blue { background: #1f6feb; color: #fff; }
+.readme-md-block {
+  background: #161b22;
+  border: 1px solid #30363d;
+  padding: .8rem; margin-top: .8rem;
+  font-size: .62rem; color: #c9d1d9; line-height: 1.7;
+  overflow-x: auto; white-space: pre;
+}
+.readme-note { font-size: .64rem; color: #8b949e; margin-top: .65rem; line-height: 1.7; }
+
+/* ── STATUSBAR ── */
+.statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .45rem 1rem;
+  background: rgba(2,3,10,0.95);
+  border-top: 1px solid var(--border);
+  font-size: .52rem; letter-spacing: .1em;
+  color: var(--text-muted); flex-shrink: 0;
+}
+.sb-left { display: flex; align-items: center; gap: .55rem; }
+.sb-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-muted); }
+.sb-dot.run { background: var(--aurora); animation: sys-pulse 1.4s infinite; }
+.sb-dot.done { background: var(--nebula-4); }
+.sb-dot.err { background: var(--nebula-3); }
+.sb-right { display: flex; gap: .9rem; color: var(--text-muted); }
+
+/* ── SPINNER & CURSOR ── */
+.spin {
+  display: inline-block; width: 11px; height: 11px;
+  border: 1.5px solid rgba(56,189,248,0.2);
+  border-top-color: var(--aurora); border-radius: 50%;
+  animation: rot .6s linear infinite;
+  vertical-align: middle; margin-right: .4rem;
+}
+@keyframes rot { to { transform: rotate(360deg); } }
+.cur {
+  display: inline-block; width: 2px; height: .85em;
+  background: var(--aurora);
+  vertical-align: text-bottom;
+  animation: blink .7s step-start infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 999;
+  background: var(--panel-hi);
+  border: 1px solid var(--border-act);
+  padding: .65rem 1rem;
+  font-size: .6rem; color: var(--aurora);
+  letter-spacing: .1em;
+  transform: translateY(8px); opacity: 0;
+  transition: all .3s cubic-bezier(.22,1,.36,1);
+  pointer-events: none;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from{opacity:0;transform:translateY(8px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.fu { animation: fadeUp .4s cubic-bezier(.22,1,.36,1) forwards; }
+
+@media(max-width:640px){
+  .shell{padding:0 .9rem 4rem;}
+  .tpl-grid{grid-template-columns:1fr;}
+  .sel-grid{grid-template-columns:1fr;}
+  .output{position:static;min-height:480px;}
+}
+</style>
+</head>
+<body>
+
+<!-- SPACE CANVAS -->
+<canvas id="cosmos"></canvas>
+
+<div class="shell">
+
+  <!-- TOPBAR -->
+  <nav class="topbar">
+    <div class="brand">
+      <div class="brand-sigil"><div class="brand-sigil-inner"></div></div>
+      <div class="brand-name">
+        Workflow Forge
+        <span>Mission Control · Deep Space Edition</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="coord" id="coordDisplay">
+        RA <span id="ra">—</span><br/>
+        DEC <span id="dec">—</span>
+      </div>
+      <div class="sys-status"><div class="sys-dot"></div>Systems Online</div>
+    </div>
+  </nav>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div>
+      <h1 class="header-title">
+        Automate your<br/>
+        <em>orbital pipeline</em>
+      </h1>
+      <p class="header-desc">
+        Describe what you need. Pick your parameters. Get a deployment-ready
+        <b>.github/workflows/</b> YAML in seconds.<br/>
+        Built for researchers, physicists &amp; scientists who ship code to orbit.
+      </p>
+    </div>
+    <div class="telemetry-block">
+      <div class="tel-row"><span>Engine</span><span>GitHub Actions</span></div>
+      <div class="tel-row"><span>Output</span><span>workflow.yml</span></div>
+      <div class="tel-row"><span>Trigger types</span><span>7 modes</span></div>
+      <div class="tel-row"><span>Runtimes</span><span>13 supported</span></div>
+      <div class="tel-row"><span>Templates</span><span>10 presets</span></div>
+      <div class="tel-row"><span>Status</span><span>Nominal ●</span></div>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+
+    <!-- ────── SIDEBAR ────── -->
+    <div class="sidebar">
+
+      <!-- Templates -->
+      <div class="pnl">
+        <div class="pnl-cap">
+          <div class="pnl-label">Preset Configurations</div>
+          <div class="pnl-aux">Science &amp; Engineering</div>
+        </div>
+        <div class="tpl-grid" id="tplGrid">
+          <button class="tpl" data-prompt="Run my Python simulation scripts with pytest, install numpy scipy matplotlib, cache pip dependencies, and run tests on every push and pull request to main branch">
+            <span class="tpl-ic">🐍</span>
+            <span class="tpl-nm">Python Simulation</span>
+            <span class="tpl-ds">pytest · numpy · scipy · matplotlib</span>
+          </button>
+          <button class="tpl" data-prompt="Compile my LaTeX thesis document automatically on every push. Use tectonic or latexmk, upload the PDF as an artifact, and deploy it to GitHub Pages">
+            <span class="tpl-ic">📄</span>
+            <span class="tpl-nm">LaTeX Build</span>
+            <span class="tpl-ds">tectonic · PDF artifact · Pages</span>
+          </button>
+          <button class="tpl" data-prompt="Execute all Jupyter notebooks in my repository using nbconvert, fail the workflow if any notebook has an error, and save the executed notebooks as artifacts">
+            <span class="tpl-ic">📓</span>
+            <span class="tpl-nm">Jupyter Execute</span>
+            <span class="tpl-ds">nbconvert · validate · artifacts</span>
+          </button>
+          <button class="tpl" data-prompt="Build a Docker container for my physics simulation environment, push it to GitHub Container Registry on every release tag, include all Python dependencies from requirements.txt">
+            <span class="tpl-ic">🐳</span>
+            <span class="tpl-nm">Docker Env</span>
+            <span class="tpl-ds">GHCR · reproducible builds</span>
+          </button>
+          <button class="tpl" data-prompt="Deploy my MkDocs or Sphinx documentation site to GitHub Pages whenever I push to main. Install all documentation dependencies and build the site automatically">
+            <span class="tpl-ic">📚</span>
+            <span class="tpl-nm">Docs Deploy</span>
+            <span class="tpl-ds">MkDocs · Sphinx · Pages</span>
+          </button>
+          <button class="tpl" data-prompt="Run my data analysis pipeline: install dependencies, run Python scripts for data processing, generate plots with matplotlib, upload all figures and output CSVs as artifacts">
+            <span class="tpl-ic">📊</span>
+            <span class="tpl-nm">Data Pipeline</span>
+            <span class="tpl-ds">process · plot · export CSVs</span>
+          </button>
+          <button class="tpl" data-prompt="Build and test my Rust simulation code, run cargo test and cargo clippy on every push, target linux and macos, upload release binaries as artifacts on tags">
+            <span class="tpl-ic">⚙️</span>
+            <span class="tpl-nm">Rust Build</span>
+            <span class="tpl-ds">cargo · clippy · cross-platform</span>
+          </button>
+          <button class="tpl" data-prompt="Run scheduled nightly benchmarks on my HPC simulation code, save timing results to a CSV artifact, and post a summary comment on open PRs when performance changes more than 5%">
+            <span class="tpl-ic">⏱️</span>
+            <span class="tpl-nm">Nightly Bench</span>
+            <span class="tpl-ds">cron · perf track · PR comments</span>
+          </button>
+          <button class="tpl" data-prompt="Build and push a multi-arch Docker image (amd64 and arm64) to Docker Hub and GitHub Container Registry on every release, using Docker Buildx and layer caching">
+            <span class="tpl-ic">🏗️</span>
+            <span class="tpl-nm">Multi-arch Docker</span>
+            <span class="tpl-ds">buildx · amd64+arm64 · GHCR</span>
+          </button>
+          <button class="tpl" data-prompt="Auto-generate a changelog from git commits using conventional commits, bump semantic version, create a GitHub Release with release notes and compiled artifacts">
+            <span class="tpl-ic">🏷️</span>
+            <span class="tpl-nm">Auto Release</span>
+            <span class="tpl-ds">semver · changelog · releases</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Describe -->
+      <div class="pnl">
+        <div class="pnl-cap">
+          <div class="pnl-label">Transmission Input</div>
+        </div>
+        <div class="p-body">
+          <div class="fl">
+            <div class="lbl">Mission brief</div>
+            <div class="lbl cc" id="cc">0 chars</div>
+          </div>
+          <textarea id="ta" rows="6"
+            placeholder='Describe what your workflow should do — be specific about triggers, OS, language version, packages, secrets, notifications, or anything else.
+
+e.g. "Run pytest on my Qiskit code with Python 3.11 on Ubuntu, cache pip, fail fast, send Slack alert on failure"'></textarea>
+
+          <!-- Feature chips -->
+          <div class="feat-row">
+            <label class="chip on" id="ch-comments"><input type="checkbox" id="opt-comments" checked/> Comments</label>
+            <label class="chip on" id="ch-cache"><input type="checkbox" id="opt-cache" checked/> Cache</label>
+            <label class="chip" id="ch-matrix"><input type="checkbox" id="opt-matrix"/> Matrix</label>
+            <label class="chip on" id="ch-artifacts"><input type="checkbox" id="opt-artifacts" checked/> Artifacts</label>
+            <label class="chip" id="ch-notify"><input type="checkbox" id="opt-notify"/> Notify</label>
+            <label class="chip" id="ch-security"><input type="checkbox" id="opt-security"/> Security</label>
+            <label class="chip" id="ch-release"><input type="checkbox" id="opt-release"/> Auto-release</label>
+            <label class="chip" id="ch-concurrency"><input type="checkbox" id="opt-concurrency"/> Concurrency</label>
+          </div>
+
+          <!-- Selects -->
+          <div class="sel-grid">
+            <div class="sg">
+              <div class="lbl">Runner OS</div>
+              <select id="sel-os">
+                <option value="ubuntu-latest">Ubuntu Latest</option>
+                <option value="ubuntu-22.04">Ubuntu 22.04</option>
+                <option value="ubuntu-20.04">Ubuntu 20.04</option>
+                <option value="macos-latest">macOS Latest</option>
+                <option value="windows-latest">Windows Latest</option>
+                <option value="multi">Ubuntu + macOS</option>
+                <option value="all">All three OS</option>
+                <option value="self-hosted">Self-hosted</option>
+              </select>
+            </div>
+            <div class="sg">
+              <div class="lbl">Runtime</div>
+              <select id="sel-lang">
+                <option value="python">Python</option>
+                <option value="python3.11">Python 3.11</option>
+                <option value="python3.12">Python 3.12</option>
+                <option value="node">Node.js</option>
+                <option value="rust">Rust</option>
+                <option value="julia">Julia</option>
+                <option value="r">R</option>
+                <option value="go">Go</option>
+                <option value="cpp">C / C++</option>
+                <option value="fortran">Fortran</option>
+                <option value="latex">LaTeX</option>
+                <option value="docker">Docker only</option>
+                <option value="mixed">Mixed / Other</option>
+              </select>
+            </div>
+            <div class="sg">
+              <div class="lbl">Trigger</div>
+              <select id="sel-trigger">
+                <option value="push-pr">Push + Pull Request</option>
+                <option value="push">Push only</option>
+                <option value="pr">Pull Request only</option>
+                <option value="tag">Release / Tag</option>
+                <option value="schedule">Scheduled cron</option>
+                <option value="manual">Manual dispatch</option>
+                <option value="all">All triggers</option>
+              </select>
+            </div>
+            <div class="sg">
+              <div class="lbl">Verbosity</div>
+              <select id="sel-style">
+                <option value="production">Production-ready</option>
+                <option value="minimal">Minimal</option>
+                <option value="verbose">Verbose + docs</option>
+                <option value="beginner">Beginner-friendly</option>
+                <option value="advanced">Expert / Advanced</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="launch" id="launchBtn" onclick="generate()">
+            <span id="launchInner">▶ Compile Workflow</span>
+          </button>
+          <div class="hint">ctrl + enter to launch</div>
+        </div>
+      </div>
+
+      <!-- Quick prompts -->
+      <div class="pnl">
+        <div class="pnl-cap"><div class="pnl-label">Orbital Examples</div></div>
+        <div class="qp-list">
+          <span class="qp" onclick="sp('Run LAMMPS molecular dynamics scripts, save trajectory output files as artifacts on every push')">LAMMPS MD</span>
+          <span class="qp" onclick="sp('Compile LaTeX paper with BibTeX and deploy PDF to GitHub Releases on every tag')">LaTeX + BibTeX</span>
+          <span class="qp" onclick="sp('Run pytest on Qiskit code, test Python 3.10 and 3.11, post results as PR comment')">Qiskit tests</span>
+          <span class="qp" onclick="sp('Weekly cron to scrape experimental data, commit to repo, open PR automatically')">Scheduled scrape</span>
+          <span class="qp" onclick="sp('Lint Python simulation with flake8 and black, block merges on formatting failures')">Code linting</span>
+          <span class="qp" onclick="sp('Build Sphinx docs from docstrings, deploy to GitHub Pages, add README status badge')">Sphinx docs</span>
+          <span class="qp" onclick="sp('Train scikit-learn model, export pickle artifact, post accuracy metrics as PR comment')">ML pipeline</span>
+          <span class="qp" onclick="sp('Run FEniCS finite element simulations in Docker, upload VTK result files as artifacts')">FEniCS + Docker</span>
+          <span class="qp" onclick="sp('Publish Python package to PyPI automatically when pushing a version tag')">PyPI release</span>
+          <span class="qp" onclick="sp('Security scan with bandit and safety on every PR, fail if critical vulnerabilities found')">Security scan</span>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="pnl">
+        <div class="pnl-cap">
+          <div class="pnl-label">Mission Log</div>
+          <button class="act" onclick="clearHistory()">Clear</button>
+        </div>
+        <div id="historyBody"><div class="hist-empty">No missions logged</div></div>
+      </div>
+    </div>
+
+    <!-- ────── OUTPUT ────── -->
+    <div class="output" id="outPanel">
+      <div class="out-toolbar">
+        <div style="display:flex;align-items:center;gap:.8rem;min-width:0">
+          <div class="tabs">
+            <button class="tab on" id="t-yaml" onclick="switchTab('yaml')">workflow.yml</button>
+            <button class="tab" id="t-explain" onclick="switchTab('explain')">breakdown</button>
+            <button class="tab" id="t-readme" onclick="switchTab('readme')">badge</button>
+          </div>
+          <div class="out-meta" id="outMeta"></div>
+        </div>
+        <div class="act-row">
+          <button class="act" id="copyBtn" onclick="copyYaml()">Copy</button>
+          <button class="act" onclick="dlYaml()">Download</button>
+          <button class="act" onclick="clearOutput()">Clear</button>
+        </div>
+      </div>
+
+      <div class="out-body" id="outBody">
+        <!-- YAML -->
+        <div id="v-yaml">
+          <div class="void-state" id="voidState">
+            <div class="void-glyph">{ }</div>
+            <div class="void-msg">Select a preset or describe your workflow<br/>Your <code>.github/workflows/workflow.yml</code> lands here</div>
+          </div>
+          <pre id="yamlOut" style="display:none"></pre>
+        </div>
+        <!-- Explain -->
+        <div id="v-explain" style="display:none">
+          <div class="void-state" id="explainVoid">
+            <div class="void-glyph">?</div>
+            <div class="void-msg">Compile a workflow first</div>
+          </div>
+          <div class="explain-wrap" id="explainContent" style="display:none"></div>
+        </div>
+        <!-- README -->
+        <div id="v-readme" style="display:none">
+          <div class="void-state" id="readmeVoid">
+            <div class="void-glyph">★</div>
+            <div class="void-msg">Compile a workflow first</div>
+          </div>
+          <div class="readme-wrap" id="readmeContent" style="display:none"></div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left">
+          <div class="sb-dot" id="sbDot"></div>
+          <span id="sbText">Awaiting transmission</span>
+        </div>
+        <div class="sb-right">
+          <span id="sbLines"></span>
+          <span>github-actions</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ══ SPACE CANVAS SCRIPT ══ -->
+<script>
+(function(){
+const C = document.getElementById('cosmos');
+const ctx = C.getContext('2d');
+let W, H, frame = 0;
+let mouse = {x: W/2, y: H/2};
+document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+function resize(){
+  W = C.width = window.innerWidth;
+  H = C.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+/* ── Stars ── */
+const STAR_COUNT = 280;
+const stars = Array.from({length: STAR_COUNT}, () => ({
+  x: Math.random(), y: Math.random(),
+  r: Math.random() * 1.6 + 0.2,
+  a: Math.random(),
+  speed: Math.random() * 0.0003 + 0.0001,
+  color: ['#e8f0ff','#c8d8ff','#b0c8ff','#ffd8c0','#ffe8d0'][Math.floor(Math.random()*5)],
+  twinkleSpeed: Math.random() * 0.02 + 0.005,
+  twinkleOffset: Math.random() * Math.PI * 2,
+}));
+
+/* ── Nebulae ── */
+const nebulae = [
+  {x:0.15, y:0.25, rx:280, ry:200, color:'rgba(124,58,237,', a:0.055, rot:0.2},
+  {x:0.78, y:0.15, rx:220, ry:160, color:'rgba(14,165,233,', a:0.045, rot:-0.3},
+  {x:0.88, y:0.72, rx:260, ry:180, color:'rgba(236,72,153,', a:0.04,  rot:0.5},
+  {x:0.32, y:0.82, rx:200, ry:140, color:'rgba(16,185,129,', a:0.035, rot:-0.1},
+  {x:0.55, y:0.45, rx:180, ry:120, color:'rgba(56,189,248,',  a:0.03,  rot:0.3},
+];
+
+/* ── Galaxies ── */
+const galaxies = [
+  {x:0.22, y:0.6,  arms:5, r:60, speed:0.0008, a:0.35, color:'rgba(180,210,255,'},
+  {x:0.7,  y:0.35, arms:4, r:45, speed:-0.001, a:0.3,  color:'rgba(255,200,160,'},
+  {x:0.6,  y:0.78, arms:6, r:50, speed:0.0006, a:0.25, color:'rgba(160,200,255,'},
+];
+
+/* ── Black holes ── */
+const holes = [
+  {x:0.08, y:0.88, r:22, diskR:52, angle:0, speed:0.008, color:'rgba(138,100,255,'},
+  {x:0.92, y:0.55, r:18, diskR:42, angle:Math.PI, speed:-0.006, color:'rgba(56,189,248,'},
+];
+
+/* ── Shooting stars ── */
+let shooters = [];
+function spawnShooter(){
+  if(shooters.length >= 3) return;
+  shooters.push({
+    x: Math.random() * W,
+    y: Math.random() * H * 0.5,
+    vx: (Math.random() * 4 + 3) * (Math.random()<0.5?1:-1),
+    vy: Math.random() * 2 + 1,
+    len: Math.random() * 80 + 60,
+    life: 1, decay: Math.random() * 0.02 + 0.015,
+    color: ['#e8f0ff','#c8d8ff','#ffd8c0'][Math.floor(Math.random()*3)],
+  });
+}
+setInterval(spawnShooter, 2800);
+
+function drawNebula(n){
+  const gx = n.x * W, gy = n.y * H;
+  ctx.save();
+  ctx.translate(gx, gy);
+  ctx.rotate(n.rot + frame * 0.0001);
+  for(let i=3;i>=0;i--){
+    const g = ctx.createRadialGradient(0,0,0, 0,0, n.rx*(1+i*0.3));
+    g.addColorStop(0, n.color + (n.a * (1-i*0.2)) + ')');
+    g.addColorStop(0.5, n.color + (n.a * 0.4 * (1-i*0.15)) + ')');
+    g.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.ellipse(0,0, n.rx*(1+i*0.3), n.ry*(1+i*0.3), 0, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGalaxy(g, t){
+  const gx = g.x * W, gy = g.y * H;
+  const angle = t * g.speed;
+  ctx.save();
+  ctx.translate(gx, gy);
+  for(let arm=0; arm<g.arms; arm++){
+    const armAngle = (arm / g.arms) * Math.PI * 2 + angle;
+    for(let i=0; i<40; i++){
+      const frac = i / 40;
+      const r = frac * g.r;
+      const spin = frac * Math.PI * 2.5 + armAngle;
+      const px = Math.cos(spin) * r;
+      const py = Math.sin(spin) * r * 0.45;
+      const starA = g.a * (1 - frac * 0.8);
+      const sr = (1 - frac) * 1.8 + 0.2;
+      ctx.beginPath();
+      ctx.arc(px, py, sr, 0, Math.PI*2);
+      ctx.fillStyle = g.color + starA + ')';
+      ctx.fill();
+    }
+  }
+  // Core glow
+  const cg = ctx.createRadialGradient(0,0,0, 0,0,g.r*0.4);
+  cg.addColorStop(0, g.color + (g.a*1.2) + ')');
+  cg.addColorStop(1, 'transparent');
+  ctx.beginPath();
+  ctx.arc(0,0, g.r*0.4, 0, Math.PI*2);
+  ctx.fillStyle = cg;
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBlackHole(h, t){
+  const hx = h.x * W, hy = h.y * H;
+  h.angle += h.speed;
+  ctx.save();
+  ctx.translate(hx, hy);
+
+  // Accretion disk (ellipse rings)
+  for(let ring=0; ring<6; ring++){
+    const rFrac = ring / 6;
+    const rr = h.diskR * (0.5 + rFrac * 0.5);
+    const diskA = (1 - rFrac) * 0.12;
+    ctx.beginPath();
+    ctx.ellipse(0,0, rr, rr*0.28, h.angle, 0, Math.PI*2);
+    ctx.strokeStyle = h.color + diskA + ')';
+    ctx.lineWidth = 2 - rFrac;
+    ctx.stroke();
+  }
+
+  // Disk bright particles
+  for(let p=0; p<18; p++){
+    const pa = h.angle + (p/18)*Math.PI*2;
+    const pr = h.diskR * (0.6 + Math.sin(pa*3+t*0.02)*0.15);
+    const px = Math.cos(pa) * pr;
+    const py = Math.sin(pa) * pr * 0.28;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.2, 0, Math.PI*2);
+    ctx.fillStyle = h.color + '0.5)';
+    ctx.fill();
+  }
+
+  // Event horizon
+  const eg = ctx.createRadialGradient(0,0,0, 0,0,h.r);
+  eg.addColorStop(0, '#000');
+  eg.addColorStop(0.7, '#000');
+  eg.addColorStop(1, h.color + '0.15)');
+  ctx.beginPath();
+  ctx.arc(0,0, h.r, 0, Math.PI*2);
+  ctx.fillStyle = eg;
+  ctx.fill();
+
+  // Photon ring
+  ctx.beginPath();
+  ctx.arc(0,0, h.r+1.5, 0, Math.PI*2);
+  ctx.strokeStyle = h.color + '0.6)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawStar(s, t){
+  const twinkle = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed + s.twinkleOffset);
+  const alpha = s.a * (0.3 + 0.7 * twinkle);
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI*2);
+  ctx.fillStyle = s.color;
+  ctx.fill();
+
+  if(s.r > 1.1){
+    ctx.globalAlpha = alpha * 0.3;
+    const g = ctx.createRadialGradient(s.x*W, s.y*H, 0, s.x*W, s.y*H, s.r*4);
+    g.addColorStop(0, s.color);
+    g.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(s.x*W, s.y*H, s.r*4, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawShooters(){
+  shooters = shooters.filter(s => s.life > 0);
+  for(const s of shooters){
+    ctx.save();
+    const g = ctx.createLinearGradient(s.x, s.y, s.x - s.vx*(s.len/s.speed||s.len*0.3), s.y - s.vy*(s.len/s.speed||s.len*0.3));
+    g.addColorStop(0, s.color.replace(')',`,${s.life})`));
+    g.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(s.x - s.vx*20, s.y - s.vy*20);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 1.5 * s.life;
+    ctx.stroke();
+    ctx.restore();
+    s.x += s.vx;
+    s.y += s.vy;
+    s.life -= s.decay;
+    if(s.x < 0 || s.x > W || s.y > H) s.life = 0;
+  }
+}
+
+// Mouse parallax for nebulae
+function drawParallaxNebula(n, depth){
+  const dx = (mouse.x / W - 0.5) * depth;
+  const dy = (mouse.y / H - 0.5) * depth;
+  const shifted = { ...n, x: n.x + dx*0.04, y: n.y + dy*0.04 };
+  drawNebula(shifted);
+}
+
+function draw(t){
+  frame++;
+  ctx.clearRect(0,0,W,H);
+
+  // Deep space bg
+  ctx.fillStyle = '#02030a';
+  ctx.fillRect(0,0,W,H);
+
+  // Nebulae with parallax
+  ctx.globalCompositeOperation = 'screen';
+  nebulae.forEach((n,i) => drawParallaxNebula(n, i%2===0?1:-1));
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Galaxies
+  ctx.globalCompositeOperation = 'screen';
+  galaxies.forEach(g => drawGalaxy(g, t));
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Stars (twinkle)
+  stars.forEach(s => { s.a = 0.4 + Math.random()*0.05; drawStar(s, t); });
+
+  // Shooting stars
+  drawShooters();
+
+  // Black holes (on top)
+  holes.forEach(h => drawBlackHole(h, t));
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// Update coordinate display
+function updateCoords(){
+  const ra = ((mouse.x / window.innerWidth) * 24).toFixed(2);
+  const dec = (((mouse.y / window.innerHeight) - 0.5) * -180).toFixed(1);
+  document.getElementById('ra').textContent = ra + 'h';
+  document.getElementById('dec').textContent = (dec > 0 ? '+' : '') + dec + '°';
+}
+document.addEventListener('mousemove', updateCoords);
+})();
+</script>
+
+<!-- ══ APP SCRIPT ══ -->
+<script>
+/* ── State ── */
+let currentYaml = '';
+let history = [];
+try{ history = JSON.parse(localStorage.getItem('wf-hist') || '[]'); }catch(e){}
+let activeTab = 'yaml';
+
+/* ── Init chips ── */
+document.querySelectorAll('.chip').forEach(chip => {
+  const cb = chip.querySelector('input');
+  chip.classList.toggle('on', !!cb?.checked);
+  chip.addEventListener('click', () => {
+    setTimeout(() => chip.classList.toggle('on', !!cb?.checked), 0);
+  });
+});
+
+/* ── Textarea ── */
+const ta = document.getElementById('ta');
+ta.addEventListener('input', () => {
+  document.getElementById('cc').textContent = ta.value.length + ' chars';
+});
+ta.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)) generate();
+});
+
+/* ── Templates ── */
+document.querySelectorAll('.tpl').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tpl').forEach(x => x.classList.remove('picked'));
+    b.classList.add('picked');
+    ta.value = b.dataset.prompt;
+    ta.dispatchEvent(new Event('input'));
+    ta.focus();
+  });
+});
+
+function sp(t){ ta.value = t; ta.dispatchEvent(new Event('input')); ta.focus(); }
+
+/* ── Tabs ── */
+function switchTab(t){
+  activeTab = t;
+  ['yaml','explain','readme'].forEach(x => {
+    document.getElementById('t-'+x).classList.toggle('on', x===t);
+    document.getElementById('v-'+x).style.display = x===t ? 'block' : 'none';
+  });
+}
+
+/* ── Status ── */
+function setSt(state, text, lines){
+  const d = document.getElementById('sbDot');
+  d.className = 'sb-dot' + (state ? ' '+state : '');
+  document.getElementById('sbText').textContent = text;
+  document.getElementById('sbLines').textContent = lines || '';
+}
+
+/* ── Clear ── */
+function clearOutput(){
+  currentYaml = '';
+  document.getElementById('voidState').style.display = 'flex';
+  document.getElementById('yamlOut').style.display = 'none';
+  document.getElementById('explainVoid').style.display = 'flex';
+  document.getElementById('explainContent').style.display = 'none';
+  document.getElementById('explainContent').innerHTML = '';
+  document.getElementById('readmeVoid').style.display = 'flex';
+  document.getElementById('readmeContent').style.display = 'none';
+  document.getElementById('outMeta').textContent = '';
+  setSt('', 'Awaiting transmission');
+  switchTab('yaml');
+}
+
+/* ── Copy ── */
+async function copyYaml(){
+  if(!currentYaml) return;
+  await navigator.clipboard.writeText(currentYaml);
+  const b = document.getElementById('copyBtn');
+  b.textContent = '✓ Copied'; b.classList.add('ok');
+  setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('ok'); }, 2000);
+  toast('YAML copied to clipboard');
+}
+
+/* ── Download ── */
+function dlYaml(){
+  if(!currentYaml) return;
+  const a = document.createElement('a');
+  a.href = 'data:text/yaml;charset=utf-8,' + encodeURIComponent(currentYaml);
+  a.download = 'workflow.yml'; a.click();
+  toast('Downloading workflow.yml');
+}
+
+/* ── Toast ── */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ── History ── */
+function saveHistory(prompt, yaml){
+  history.unshift({ prompt: prompt.slice(0,120), yaml, time: new Date().toISOString() });
+  if(history.length > 20) history = history.slice(0,20);
+  try{ localStorage.setItem('wf-hist', JSON.stringify(history)); }catch(e){}
+  renderHistory();
+}
+function clearHistory(){
+  history = [];
+  try{ localStorage.setItem('wf-hist','[]'); }catch(e){}
+  renderHistory();
+}
+function renderHistory(){
+  const el = document.getElementById('historyBody');
+  if(!history.length){ el.innerHTML = '<div class="hist-empty">No missions logged</div>'; return; }
+  el.innerHTML = '<div class="hist-list">' +
+    history.map((h,i) => {
+      const d = new Date(h.time);
+      const ts = d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      return `<div class="hist-item" onclick="loadHist(${i})">
+        <span class="hist-txt">${esc(h.prompt)}</span>
+        <span class="hist-time">${ts}</span>
+      </div>`;
+    }).join('') + '</div>';
+}
+function loadHist(i){
+  const h = history[i];
+  currentYaml = h.yaml;
+  renderYaml(h.yaml);
+  toast('Mission log loaded');
+}
+renderHistory();
+
+/* ── README badge ── */
+function buildReadme(yaml){
+  const name = (yaml.match(/^name:\s*(.+)/m)||[])[1] || 'CI';
+  const hasTest = /test|pytest|jest/i.test(yaml);
+  const hasBuild = /build|docker|compile/i.test(yaml);
+  const hasDeploy = /deploy|pages|release/i.test(yaml);
+  const badges = [];
+  badges.push(`<div class="bdg bdg-pass">${esc(name)} · passing</div>`);
+  if(hasTest) badges.push('<div class="bdg bdg-gray">tests · passing</div>');
+  if(hasBuild) badges.push('<div class="bdg bdg-gray">build · ok</div>');
+  if(hasDeploy) badges.push('<div class="bdg bdg-blue">docs · live</div>');
+  const md = `[![${name}](https://github.com/USERNAME/REPO/actions/workflows/workflow.yml/badge.svg)](https://github.com/USERNAME/REPO/actions/workflows/workflow.yml)`;
+  document.getElementById('readmeContent').innerHTML = `
+    <div class="readme-gh">
+      <h2>${esc(name)}</h2>
+      <div class="bdg-row">${badges.join('')}</div>
+      <div style="font-family:-apple-system,sans-serif;font-size:.78rem;color:#8b949e;line-height:1.7;margin-bottom:.7rem">
+        Add this to your README.md:
+      </div>
+      <div class="readme-md-block">${esc(md)}</div>
+      <div class="readme-note">Replace <code>USERNAME/REPO</code> with your GitHub username and repository name.</div>
+    </div>`;
+  document.getElementById('readmeVoid').style.display = 'none';
+  document.getElementById('readmeContent').style.display = 'block';
+}
+
+/* ── GENERATE ── */
+async function generate(){
+  const prompt = ta.value.trim();
+  if(!prompt){ ta.focus(); return; }
+
+  const opts = {
+    comments:    document.getElementById('opt-comments').checked,
+    cache:       document.getElementById('opt-cache').checked,
+    matrix:      document.getElementById('opt-matrix').checked,
+    artifacts:   document.getElementById('opt-artifacts').checked,
+    notify:      document.getElementById('opt-notify').checked,
+    security:    document.getElementById('opt-security').checked,
+    release:     document.getElementById('opt-release').checked,
+    concurrency: document.getElementById('opt-concurrency').checked,
+    os:          document.getElementById('sel-os').value,
+    lang:        document.getElementById('sel-lang').value,
+    trigger:     document.getElementById('sel-trigger').value,
+    style:       document.getElementById('sel-style').value,
+  };
+
+  const btn = document.getElementById('launchBtn');
+  btn.disabled = true;
+  document.getElementById('launchInner').innerHTML = '<span class="spin"></span>Compiling orbit…';
+
+  document.getElementById('voidState').style.display = 'none';
+  document.getElementById('yamlOut').style.display = 'block';
+  document.getElementById('yamlOut').innerHTML = '<span class="cur"></span>';
+  setSt('run', 'Compiling workflow…');
+  switchTab('yaml');
+
+  const trigMap = {
+    'push-pr':'push to any branch and pull_request to main',
+    'push':'push to main only',
+    'pr':'pull_request to main only',
+    'tag':'push of version tags (v*.*.*)',
+    'schedule':'scheduled cron (nightly at midnight UTC)',
+    'manual':'workflow_dispatch (manual trigger with optional inputs)',
+    'all':'push, pull_request, schedule (nightly), and workflow_dispatch',
+  };
+  const styMap = {
+    'production':'production-ready with best practices: timeout-minutes, permissions, fail-fast, continue-on-error where appropriate',
+    'minimal':'minimal, clean, no fluff — only essential steps',
+    'verbose':'verbose with detailed comments explaining every step and why',
+    'beginner':'beginner-friendly with extensive comments explaining GitHub Actions concepts as if teaching',
+    'advanced':'advanced with expert features: composite action hints, reusable workflow patterns, job dependencies, outputs',
+  };
+
+  const sys = `You are a senior DevOps engineer specializing in GitHub Actions for scientific computing, HPC, and research software.
+
+Generate a complete, production-ready GitHub Actions workflow YAML file.
+
+STRICT OUTPUT RULES:
+- Output ONLY raw YAML — no markdown backticks, no code fences, no preamble text, no "Here is your workflow"
+- Start immediately with: name:
+- The file must be valid and ready to save as .github/workflows/workflow.yml
+
+SETTINGS TO APPLY:
+- Inline comments: ${opts.comments ? 'yes — explain each important section' : 'no — keep clean'}
+- Dependency caching: ${opts.cache ? 'yes — pip/npm/cargo/bundle cache' : 'no'}
+- Matrix strategy: ${opts.matrix ? 'yes — multiple versions or OS where sensible' : 'no — single environment unless requested'}
+- Upload artifacts: ${opts.artifacts ? 'yes — upload important outputs' : 'no — skip unless critical'}
+- Failure notifications: ${opts.notify ? 'yes — add Slack or email notify step on failure' : 'no'}
+- Security scanning: ${opts.security ? 'yes — add bandit/safety/trivy security job' : 'no'}
+- Auto-release: ${opts.release ? 'yes — create GitHub Release on version tags' : 'no'}
+- Concurrency control: ${opts.concurrency ? 'yes — cancel in-progress runs on new push' : 'no'}
+- Runner: ${opts.os === 'multi' ? 'ubuntu-latest and macos-latest' : opts.os === 'all' ? 'ubuntu-latest, macos-latest, windows-latest' : opts.os}
+- Primary language: ${opts.lang}
+- Trigger: ${trigMap[opts.trigger]||opts.trigger}
+- Style: ${styMap[opts.style]||opts.style}
+
+QUALITY STANDARDS:
+- Use modern pinned actions: actions/checkout@v4, actions/setup-python@v5, actions/cache@v4, actions/upload-artifact@v4, actions/setup-node@v4
+- Never use @main or @master — always use versioned tags
+- Science domain knowledge: numpy, scipy, matplotlib, pandas, jupyter, pytest, tectonic, LAMMPS, Qiskit, FEniCS, OpenFOAM, Julia, R packages, HDF5, VTK, netCDF4
+- For Python: prefer setup-python cache: pip over separate cache step
+- Include permissions: {} at workflow level for security when appropriate
+
+AFTER THE YAML:
+Add exactly this on its own line: ---EXPLAIN---
+Then 2-3 sentences summarizing the workflow, then bullet points using • as bullet character for key design decisions.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2600,
+        system: sys,
+        messages: [{ role: 'user', content: 'Generate a GitHub Actions workflow for: ' + prompt }]
+      })
+    });
+
+    if(!resp.ok){
+      const e = await resp.json().catch(()=>({}));
+      throw new Error(e.error?.message || 'HTTP ' + resp.status);
+    }
+
+    const data = await resp.json();
+    const full = (data.content||[]).map(b=>b.text||'').join('');
+    const parts = full.split('---EXPLAIN---');
+    let yaml = (parts[0]||'').trim().replace(/^```[a-z]*\n?/gm,'').replace(/```\s*$/gm,'').trim();
+    const explain = (parts[1]||'').trim();
+
+    currentYaml = yaml;
+    renderYaml(yaml);
+
+    if(explain) renderExplain(explain);
+    buildReadme(yaml);
+
+    const lines = yaml.split('\n').length;
+    setSt('done', 'Transmission complete', lines + ' lines');
+    document.getElementById('outMeta').textContent = lines + ' lines';
+    saveHistory(prompt, yaml);
+    toast('Workflow compiled successfully');
+
+  } catch(err) {
+    document.getElementById('yamlOut').innerHTML =
+      `<span style="color:#ec4899;font-family:var(--mono);font-size:.7rem"># Transmission error: ${esc(err.message)}\n# Check connection and retry.</span>`;
+    setSt('err', 'Error — ' + err.message.slice(0,55));
+  }
+
+  btn.disabled = false;
+  document.getElementById('launchInner').innerHTML = '▶ Compile Workflow';
+}
+
+/* ── Render YAML ── */
+function renderYaml(yaml){
+  const lines = yaml.split('\n');
+  const html = lines.map((line, i) => {
+    return `<div class="yl"><span class="ln">${i+1}</span><span class="ylc">${hlLine(line)}</span></div>`;
+  }).join('');
+  const pre = document.getElementById('yamlOut');
+  pre.innerHTML = html;
+  pre.style.display = 'block';
+  pre.classList.add('fu');
+}
+
+function hlLine(line){
+  let h = esc(line);
+  if(/^\s*#/.test(line)) return `<span class="c">${h}</span>`;
+  h = h.replace(/^(\s*)([a-zA-Z_\-]+)(:)(\s|$)/, (m,sp,k,co,rest) =>
+    `${sp}<span class="k">${k}</span><span class="p">${co}</span>${rest}`);
+  h = h.replace(/^(\s*)(- )/, (m,sp) => `${sp}<span class="p">- </span>`);
+  h = h.replace(/(\$\{\{[^}]*\}\})/g, m => `<span class="x">${m}</span>`);
+  h = h.replace(/('([^']*)'|"([^"]*)")/g, m => `<span class="s">${m}</span>`);
+  h = h.replace(/(:)\s+([^"'{<][^\s#<>]+)$/, (m,co,val) => `${co} <span class="v">${val}</span>`);
+  h = h.replace(/\b(true|false|null|\d+)\b/g, m => `<span class="n">${m}</span>`);
+  return h;
+}
+
+/* ── Render explain ── */
+function renderExplain(text){
+  const lines = text.split('\n').filter(l=>l.trim());
+  const bullets = lines.filter(l=>l.trim().startsWith('•'));
+  const prose = lines.filter(l=>!l.trim().startsWith('•')).join(' ');
+  let html = `<div class="explain-section">
+    <div class="explain-ttl">// What this does</div>
+    <p class="explain-p">${esc(prose)}</p>
+  </div>`;
+  if(bullets.length){
+    html += `<div class="explain-section">
+      <div class="explain-ttl">// Key design decisions</div>
+      <ul class="explain-ul">${bullets.map(b=>`<li>${esc(b.replace(/^•\s*/,''))}</li>`).join('')}</ul>
+    </div>`;
+  }
+  const el = document.getElementById('explainContent');
+  el.innerHTML = html;
+  el.style.display = 'block';
+  el.classList.add('fu');
+  document.getElementById('explainVoid').style.display = 'none';
+}
+
+function esc(s){
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
